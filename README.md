@@ -10,7 +10,10 @@ It holds what every service shares, and each service lives in its own repository
 | --- | --- |
 | `packages/nest-common` | The microservice chassis: storage with a sealed audit log, generic resource CRUD, errors, startup (`bootstrapService`) |
 | `packages/contracts` | Resource definitions and the permission matrix |
-| `service/` | Service template; `scripts/new-service.sh <name>` creates a service repository from it |
+| `service/` | Service template (with the `SERVICE.md` card); `scripts/new-service.sh <name>` creates a service repository from it |
+| `CLAUDE.md` (`AGENTS.md`) | Guide for AI tools and people: sibling folders, the old code in `../codecash`, what may change, how to port |
+| `docs/DOI_CHIEU_CODECASH.md` | Which CodeCash file moves to which service |
+| `docs/KICH_BAN_VIBE_CODE.md` | Who does what, day by day, with prompts |
 
 The base is ported from CodeCash (`github.com/Tunhoclaptrinh/Code-n-Cash`, commit `c667ec4`);
 see `docs/PHAN_TICH.md` and `CHANGELOG.md`.

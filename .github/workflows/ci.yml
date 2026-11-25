@@ -43,7 +43,7 @@ jobs:
       - run: pnpm test
       - name: API smoke
         run: |
-          STORAGE_DRIVER=file DATA_DIR=/tmp/btl-ci node service/dist/main.js > /tmp/api.log 2>&1 &
+          API_PORT=3000 STORAGE_DRIVER=file DATA_DIR=/tmp/btl-ci node service/dist/main.js > /tmp/api.log 2>&1 &
           for attempt in $(seq 1 30); do
             if curl -sf http://127.0.0.1:3000/api/v1/health; then exit 0; fi
             sleep 1

@@ -1,12 +1,13 @@
 # Quy trình nhánh: `base` và `main`
 
-Áp dụng cho repo `btl-backend`. Ai cũng đọc trước khi tạo nhánh đầu tiên.
+Áp dụng cho repo cha `btl-backend`; repo service chỉ có `main` và kéo phần nền từ repo cha
+(`docs/KIEN_TRUC_REPO.md`). Ai cũng đọc trước khi tạo nhánh đầu tiên.
 
 ## Hai nhánh dài hạn
 
 | Nhánh | Chứa gì | Ai sửa | Vào bằng |
 | --- | --- | --- | --- |
-| `base` | **Phần nền dùng chung**: `services/api/src/common/*` (repository, chuỗi băm, CRUD chung, bộ lọc lỗi, interceptor, guard), `auth.ts`, `packages/contracts/*.json`, `infra/`, cấu hình (TypeScript, ESLint, Prettier, CI, Dockerfile mẫu) | Trưởng nhóm (TV1 phụ trách kỹ thuật nền) | PR từ `core/<việc>` |
+| `base` | **Phần nền dùng chung**: chassis `packages/nest-common` (repository, chuỗi băm, CRUD chung, lỗi, interceptor, guard, kiểm token, khởi động), `packages/contracts/*.json` (mục nền), khuôn `service/`, `scripts/`, `infra/`, cấu hình (TypeScript, ESLint, Prettier, CI, Dockerfile), `CLAUDE.md`, tài liệu chung | Trưởng nhóm (TV1 phụ trách kỹ thuật nền) | PR từ `core/<việc>` |
 | `main` | Phần nền **cộng** nghiệp vụ của cả nhóm (màn, service) | Mọi người, mỗi người phần của mình | PR từ `feat/<phần>-<việc>`, `fix/…` |
 
 `main` luôn chứa `base`. `base` **không bao giờ** chứa nghiệp vụ, nên phần nền luôn tách sạch, dùng lại được, và lịch sử commit cho thấy rõ ai làm phần nền, ai làm nghiệp vụ.
@@ -30,7 +31,8 @@ Phần nền thiếu thứ gì khi đang làm nghiệp vụ (một thành phần
 ## Làm nghiệp vụ
 
 1. Tạo nhánh từ `main`: `git switch main && git pull && git switch -c feat/<phần>-<việc>` (ví dụ `feat/contracts-list`, `feat/signing-service-s1`).
-2. Chỉ sửa thư mục của mình (`CODEOWNERS`); dùng phần nền như thư viện.
+2. Chỉ sửa đường dẫn nghiệp vụ (bảng mục 4 của `CLAUDE.md`); dùng phần nền như thư viện. CI chạy
+   `scripts/check-base-untouched.mjs` và từ chối PR sửa phần nền (tự kiểm: `pnpm check:base`).
 3. PR vào `main`, một người duyệt, CI xanh, **merge commit** (giữ commit của từng người).
 
 ## Bảo vệ nhánh (GitHub)
@@ -39,6 +41,7 @@ Phần nền thiếu thứ gì khi đang làm nghiệp vụ (một thành phần
 
 - chỉ nhận thay đổi qua Pull Request, cần ít nhất 1 người duyệt, và duyệt lại khi có commit mới;
 - phải qua CI (job `verify`) và cập nhật với nhánh đích trước khi merge;
+- tệp phần nền cần người trong `.github/CODEOWNERS` duyệt;
 - cấm force push, cấm xoá nhánh.
 
 Quản trị repo (trưởng nhóm) được merge bằng quyền admin khi CI xanh mà chưa có người duyệt (`gh pr merge --admin --merge`); chỉ dùng cho việc phần nền hoặc đồng bộ `base → main` khi cả nhóm chưa ai duyệt được, không dùng để bỏ qua CI.
