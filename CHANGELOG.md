@@ -2,6 +2,8 @@
 
 Mỗi bước dựng phần nền ghi một mục; mới nhất ở trên.
 
+- **docs: let the repository admin merge when CI is green** — bảo vệ nhánh không áp dụng cho admin, để trưởng nhóm merge việc nền khi chưa có người duyệt; thành viên vẫn cần 1 người duyệt và CI xanh
+- **docs: name base task branches core/<task>; allow running CI by hand** — Git không cho có cùng lúc nhánh `base` và `base/<việc>`, nên nhánh việc của phần nền đổi thành `core/<việc>`; CI thêm `workflow_dispatch`
 - **docs: keep the base on its own branch** — nhánh `base` chỉ chứa phần nền, `main` chứa nền cộng nghiệp vụ; quy trình sửa nền rồi đồng bộ sang `main`, quy trình làm nghiệp vụ, quy tắc bảo vệ nhánh (`docs/QUY_TRINH_NHANH.md`); script bật bảo vệ nhánh trên GitHub (`scripts/protect-branches.sh`)
 - **build: add the API image and CI** — `services/api/Dockerfile` (một image cho mỗi service, build từ gốc repo), CI chạy typecheck, lint, format, test (có PostgreSQL), khởi động API, rồi build và chạy image trên PostgreSQL
 - **feat(auth): let a company sign up with its account administrator** — `POST /auth/register`: công ty mới (bên mua hoặc nhà cung cấp) kèm tài khoản quản trị công ty, kiểm trường theo `resources.json`, email và mã không trùng, mật khẩu ≥ 12 ký tự, ghi nhật ký `REGISTER`; tắt bằng `SIGNUP=false`
