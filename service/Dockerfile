@@ -20,12 +20,13 @@ FROM manifests AS build
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
 COPY packages/nest-common packages/nest-common
 COPY service service
-RUN pnpm --filter @sc/nest-common build && pnpm --filter ./service build
+RUN pnpm --filter @sc/nest-common build && pnpm --filter "{./service}" build
 
-# Production dependencies only; pnpm's relative symlinks survive the copy below.
+# Production dependencies of the service and of the chassis it uses. "{./service}..." selects by
+# directory, so a service repository can rename its package without touching this file.
 FROM manifests AS deps
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
-    pnpm install --frozen-lockfile --prod --filter ./service...
+    pnpm install --frozen-lockfile --prod --filter "{./service}..."
 
 FROM ${NODE_IMAGE} AS runtime
 ENV NODE_ENV=production \
@@ -35,9 +36,8 @@ ENV NODE_ENV=production \
     DATA_DIR=/data \
     TRUST_DIR=/data/trust
 WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
-COPY --from=deps /app/packages/nest-common/node_modules ./packages/nest-common/node_modules
-COPY --from=deps /app/service/node_modules ./service/node_modules
+# The production install as pnpm laid it out: root and per-package node_modules with their symlinks.
+COPY --from=deps /app ./
 COPY --from=build /app/packages/nest-common/dist ./packages/nest-common/dist
 COPY packages/nest-common/package.json ./packages/nest-common/
 COPY --from=build /app/service/dist ./service/dist
