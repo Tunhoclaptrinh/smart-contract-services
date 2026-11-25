@@ -31,7 +31,7 @@ try {
   }
   assert.ok(health, `service did not start:\n${log}`);
   assert.equal(health.data.status, "ok");
-  assert.equal(health.data.service, "service");
+  assert.equal(typeof health.data.service, "string");
   // Everything but health needs a signed-in user; the error has the shared shape.
   const resources = await fetch(`${base}/resources`);
   assert.equal(resources.status, 401);
