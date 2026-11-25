@@ -11,11 +11,12 @@ import {
   BadRequestException,
   NotFoundException,
   ForbiddenException,
+  ConflictException,
   CanActivate,
   ExecutionContext,
 } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
-import { randomBytes } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import { Repository } from "./common/repository";
@@ -25,6 +26,10 @@ import type { Actor, SessionRequest, Role, RecordEntity } from "./common/types";
 import { buildDirectory, FEATURED_ACCOUNTS } from "./seed-directory";
 import { orgAdminRefusal } from "./common/roles";
 import { auditContext } from "./common/audit-events";
+import { fieldProblem, normalizeField } from "./common/field-validation";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { repoRoot } from "./common/paths";
 /**
  * One-click demo sign-in: on by default in development, off in production unless DEMO_LOGIN=true.
  * Never enable it on a deployment that holds real data.
@@ -34,6 +39,32 @@ export function demoLoginEnabled() {
   if (process.env.DEMO_LOGIN === "false") return false;
   return process.env.NODE_ENV !== "production";
 }
+/** Self sign-up of a company; on unless SIGNUP=false. */
+export function signUpEnabled() {
+  return process.env.SIGNUP !== "false";
+}
+
+interface FieldRule {
+  key: string;
+  type: string;
+  required?: boolean;
+  maxLength?: number;
+  options?: string[];
+}
+
+/** The organisation fields of resources.json, so sign-up checks exactly what the CRUD checks. */
+const organizationFields = (): FieldRule[] => {
+  const file = JSON.parse(
+    readFileSync(
+      resolve(repoRoot(), "packages/contracts/resources.json"),
+      "utf8",
+    ),
+  ) as { name: string; fields: FieldRule[] }[];
+  return (
+    file.find((resource) => resource.name === "organizations")?.fields ?? []
+  );
+};
+
 @Injectable()
 export class AuthService {
   private secret = process.env.JWT_SECRET || randomBytes(48).toString("hex");
@@ -259,6 +290,108 @@ export class AuthService {
     );
     return { updated: true };
   }
+  /**
+   * Self sign-up: a company and its account administrator (ORG_ADMIN), who then creates the
+   * company's business accounts. Nobody signs up into an existing company or into a controller
+   * or platform role, so segregation of duties holds. Returns a session like sign-in.
+   */
+  async register(body: unknown) {
+    if (!signUpEnabled()) throw new NotFoundException("SIGNUP_DISABLED");
+    const input = (body && typeof body === "object" ? body : {}) as {
+      organization?: Record<string, unknown>;
+      admin?: Record<string, unknown>;
+    };
+    const org = input.organization ?? {};
+    const admin = input.admin ?? {};
+    const organization: Record<string, unknown> = {};
+    for (const field of organizationFields()) {
+      const problem = fieldProblem(field as never, org[field.key]);
+      if (problem) throw new BadRequestException(problem);
+      const value = normalizeField(field as never, org[field.key]);
+      if (value !== undefined && value !== "") organization[field.key] = value;
+    }
+    if (!["BUYER", "SUPPLIER"].includes(String(organization.kind)))
+      throw new BadRequestException("INVALID_ORGANIZATION_KIND");
+    const displayName =
+      typeof admin.displayName === "string" ? admin.displayName.trim() : "";
+    const email =
+      typeof admin.email === "string" ? admin.email.trim().toLowerCase() : "";
+    const password = admin.password;
+    if (!displayName || displayName.length > 250)
+      throw new BadRequestException("REQUIRED:displayName");
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254)
+      throw new BadRequestException("INVALID_EMAIL");
+    if (
+      typeof password !== "string" ||
+      password.length < 12 ||
+      password.length > 128
+    )
+      throw new BadRequestException("PASSWORD_MINIMUM_12_CHARACTERS");
+    const passwordHash = await bcrypt.hash(password, 12);
+    const now = new Date().toISOString();
+    const orgId = randomUUID();
+    const user: RecordEntity = {
+      id: randomUUID(),
+      version: 1,
+      createdAt: now,
+      updatedAt: now,
+      email,
+      displayName,
+      title: "Quản trị tài khoản công ty",
+      role: "ORG_ADMIN",
+      organizationId: orgId,
+      roleChipOrganization: String(organization.name),
+      partyId: null,
+      origin: "APP",
+      active: true,
+      passwordHash,
+    };
+    await this.repo.transact(
+      ["organizations", "users"],
+      (tables) => {
+        if (
+          tables.organizations.some(
+            (item) =>
+              String(item.code).toLowerCase() ===
+              String(organization.code).toLowerCase(),
+          )
+        )
+          throw new ConflictException("ORGANIZATION_CODE_TAKEN");
+        if (
+          tables.users.some(
+            (item) => String(item.email).toLowerCase() === email,
+          )
+        )
+          throw new ConflictException("EMAIL_TAKEN");
+        tables.organizations.push({
+          ...organization,
+          id: orgId,
+          version: 1,
+          createdAt: now,
+          updatedAt: now,
+          organizationId: orgId,
+          origin: "APP",
+        });
+        tables.users.push(user);
+      },
+      [
+        {
+          id: randomBytes(16).toString("hex"),
+          version: 1,
+          createdAt: now,
+          updatedAt: now,
+          organizationId: orgId,
+          actorId: user.id,
+          actorName: displayName,
+          actorRole: "ORG_ADMIN",
+          action: "REGISTER",
+          resource: "organizations",
+          recordId: orgId,
+        },
+      ],
+    );
+    return this.session(user);
+  }
   async logout(actor: Actor) {
     await this.repo.transact(
       ["users"],
@@ -389,6 +522,9 @@ export class AuthController {
   ) {}
   @Public() @Post("login") login(@Body() body: unknown) {
     return this.auth.login(body);
+  }
+  @Public() @Post("register") register(@Body() body: unknown) {
+    return this.auth.register(body);
   }
   @Public() @Get("demo-accounts") demoAccounts() {
     return this.auth.demoAccounts();

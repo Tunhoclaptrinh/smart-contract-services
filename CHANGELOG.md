@@ -2,6 +2,7 @@
 
 Mỗi bước dựng phần nền ghi một mục; mới nhất ở trên.
 
+- **feat(auth): let a company sign up with its account administrator** — `POST /auth/register`: công ty mới (bên mua hoặc nhà cung cấp) kèm tài khoản quản trị công ty, kiểm trường theo `resources.json`, email và mã không trùng, mật khẩu ≥ 12 ký tự, ghi nhật ký `REGISTER`; tắt bằng `SIGNUP=false`
 - **test: add the resource CRUD and PostgreSQL storage tests** — 14 test CRUD (phạm vi tổ chức, lọc, khoá phiên bản, nhập/xuất, quyền, quản trị công ty); test PostgreSQL chạy khi có `DATABASE_URL`
 - **feat: add the request pipeline and wire the API module** — lỗi thống nhất (ghi cả lần bị từ chối), bọc phản hồi, log, ghi nhật ký lần đọc, xuất nhật ký, Swagger tại `/api/docs`
 - **feat(auth): add sign-in, sessions, seed accounts and the permission API** — đăng nhập JWT, phiên vô hiệu khi đổi mật khẩu hoặc khoá, đăng nhập demo, khôi phục demo, tài khoản seed, `GET /permissions`
