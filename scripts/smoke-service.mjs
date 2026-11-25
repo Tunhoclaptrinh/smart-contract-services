@@ -4,6 +4,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import assert from "node:assert/strict";
+import { signActorToken } from "../packages/nest-common/dist/index.js";
 
 const dataDir = mkdtempSync(join(tmpdir(), "service-smoke-"));
 const port = 3900 + Math.floor(Math.random() * 90);
@@ -38,7 +39,30 @@ try {
   const problem = await resources.json();
   assert.equal(typeof problem.code, "string");
   assert.ok(problem.requestId);
-  console.log("service smoke passed: health, auth required, error shape");
+  // A token signed with the shared secret is accepted: the actor comes from its claims.
+  const token = signActorToken({
+    id: "u-smoke",
+    email: "smoke@example.test",
+    displayName: "Smoke",
+    role: "SYSTEM_ADMIN",
+    organizationId: "OPS",
+    roleChipOrganization: "OPS",
+    partyId: null,
+    title: "",
+    permissions: [],
+  });
+  const signedIn = await fetch(`${base}/resources`, {
+    headers: { authorization: `Bearer ${token}` },
+  });
+  assert.equal(signedIn.status, 200, await signedIn.clone().text());
+  const forged = await fetch(`${base}/resources`, {
+    headers: { authorization: `Bearer ${token.slice(0, -2)}xx` },
+  });
+  assert.equal(forged.status, 401);
+  assert.equal((await forged.json()).code, "INVALID_SESSION");
+  console.log(
+    "service smoke passed: health, auth required, token accepted, forged token refused",
+  );
 } finally {
   child.kill();
   rmSync(dataDir, { recursive: true, force: true });

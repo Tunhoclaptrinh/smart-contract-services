@@ -2,6 +2,9 @@
 
 Mỗi bước dựng phần nền ghi một mục; mới nhất ở trên.
 
+- **feat(nest-common): verify identity tokens in every service** — `JwtAuthGuard`, `signActorToken`, `verifyActorToken`; một `JWT_SECRET` cho mọi service, dev dùng bí mật chung cố định; khuôn service dùng guard này; smoke kiểm token đúng được nhận, token giả bị từ chối
+- **ci: refuse base changes outside the base flow** — `scripts/check-base-untouched.mjs` (`pnpm check:base`), `.github/CODEOWNERS`, `protect-branches.sh` bỏ qua nhánh repo không có và yêu cầu code owner duyệt
+- **docs: AI guide, CodeCash map, work script** — `CLAUDE.md` + `AGENTS.md`, `service/SERVICE.md` (thẻ service), `docs/DOI_CHIEU_CODECASH.md`, `docs/KICH_BAN_VIBE_CODE.md`; sửa bảng phần nền cũ trong `QUY_TRINH_NHANH.md`
 - **test: run each service's own tests** — `pnpm test` chạy thêm `test` của `service/` nếu có; smoke chấp nhận mọi tên service
 - **refactor: turn the API into the chassis and a service template** — `services/api/src/common` thành gói `packages/nest-common` (giữ lịch sử từng tệp), thêm `bootstrapService()`, `HealthController`; `service/` là khuôn service mỏng; phần riêng của identity (đăng nhập, đăng ký, tài khoản seed, test CRUD) chuyển sang repo `smart-contract-services-identity`; `docs/KIEN_TRUC_REPO.md`, `scripts/new-service.sh`; `repoRoot` dò thư mục có `packages/contracts`
 - **docs: let the repository admin merge when CI is green** — bảo vệ nhánh không áp dụng cho admin, để trưởng nhóm merge việc nền khi chưa có người duyệt; thành viên vẫn cần 1 người duyệt và CI xanh

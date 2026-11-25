@@ -5,6 +5,7 @@ import {
   BaseService,
   bootstrapService,
   HealthController,
+  JwtAuthGuard,
   PermissionsController,
   Repository,
   RolesGuard,
@@ -19,6 +20,8 @@ import {
   providers: [
     Repository,
     BaseService,
+    // Order matters: the token sets req.user, then roles and permissions are checked.
+    { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
   ],
 })

@@ -1,6 +1,8 @@
 packages:
   - packages/*
   - service
+  # Parent repository, branch main: the API gateway.
+  - gateway
 
 allowBuilds:
   "@nestjs/core": true

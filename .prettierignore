@@ -5,3 +5,5 @@ BangD-Case4
 artifacts
 .data
 docs/archive
+# Team docs are hand-formatted (no Prettier).
+*.md
