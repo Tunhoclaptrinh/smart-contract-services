@@ -17,7 +17,7 @@ import { toCsv } from "../utils/csv";
 import { can, scopeOf } from "../permissions";
 import type { Actor, Field, Resource, RecordEntity } from "../types";
 import { repoRoot } from "../paths";
-import { fold } from "../../domain/listing";
+import { fold } from "../listing";
 import { INTERNAL_ROLES, orgAdminRefusal } from "../roles";
 import { auditDigest } from "../audit-chain";
 import { fieldProblem, normalizeField } from "../field-validation";

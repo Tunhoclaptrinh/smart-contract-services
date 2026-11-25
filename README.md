@@ -1,17 +1,25 @@
-# btl-backend
+# smart-contract-services
 
-Services of the Smart Contract Workflow project (course: Microservices). NestJS 11, TypeScript.
+Parent repository of the Smart Contract Workflow services (course: Microservices). NestJS 11, TypeScript.
 
-The base (generic resource CRUD, storage with an audit hash chain, sign-in, permission matrix) is ported from CodeCash (`github.com/Tunhoclaptrinh/Code-n-Cash`, commit `c667ec4`), built here step by step; see `docs/PHAN_TICH.md` and `CHANGELOG.md`. It starts as one service (`services/api`) and is split into business services next.
+It holds what every service shares, and each service lives in its own repository beside it
+(`btl-backend-<name>` locally, `smart-contract-services-<name>` on GitHub). See
+[docs/KIEN_TRUC_REPO.md](docs/KIEN_TRUC_REPO.md).
+
+| Path | What |
+| --- | --- |
+| `packages/nest-common` | The microservice chassis: storage with a sealed audit log, generic resource CRUD, errors, startup (`bootstrapService`) |
+| `packages/contracts` | Resource definitions and the permission matrix |
+| `service/` | Service template; `scripts/new-service.sh <name>` creates a service repository from it |
+
+The base is ported from CodeCash (`github.com/Tunhoclaptrinh/Code-n-Cash`, commit `c667ec4`);
+see `docs/PHAN_TICH.md` and `CHANGELOG.md`.
 
 ```bash
 pnpm install
-cp .env.example .env
-pnpm dev          # http://127.0.0.1:3000/api/v1, Swagger at /api/docs
-pnpm test         # CRUD tests; PostgreSQL tests run when DATABASE_URL is set
+pnpm dev          # the template service on http://127.0.0.1:3000/api/v1
+pnpm test         # chassis storage tests (PostgreSQL when DATABASE_URL is set) and a service smoke
 ```
-
-Seed accounts (password `Passw0rd!` in development): `sysadmin@codecash.vn`, `auditor@codecash.vn`, `admin@novaan.vn`, `owner@novaan.vn`, `controller@novaan.vn`, `supplier@phuminh.vn`.
 
 ## Branches
 
