@@ -7,8 +7,8 @@
     "build": "pnpm -r --if-present build",
     "typecheck": "pnpm -r --if-present typecheck",
     "lint": "eslint --max-warnings 0 services",
-    "format": "prettier --write services",
-    "format:check": "prettier --check services"
+    "format": "prettier --write services packages",
+    "format:check": "prettier --check services packages"
   },
   "devDependencies": {
     "@types/node": "^26.6.5",
