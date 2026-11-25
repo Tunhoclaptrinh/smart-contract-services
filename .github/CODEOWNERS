@@ -1,0 +1,14 @@
+# Base files need the base owner's review (docs/QUY_TRINH_NHANH.md); CI also refuses base changes
+# outside the base flow (scripts/check-base-untouched.mjs). Business paths have no fixed owner:
+# the service repository's owner reviews them.
+*                     @Tunhoclaptrinh
+/service/
+/packages/contracts/
+/pnpm-lock.yaml
+/README.md
+/CHANGELOG.md
+/gateway/
+/postman/
+/compose.yaml
+/docs/thi-nghiem/
+/docs/bao-cao/

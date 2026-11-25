@@ -3,6 +3,7 @@
  * a sealed audit log, generic resource CRUD, errors, interceptors, guards, startup). It holds no
  * business rules and no business data; those live in each service's own repository.
  */
+export * from "./auth-token";
 export * from "./bootstrap";
 export * from "./health.controller";
 export * from "./permissions.controller";

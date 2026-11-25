@@ -21,5 +21,7 @@ d.name = "@sc/" + process.argv[1] + "-service";
 fs.writeFileSync(p, JSON.stringify(d, null, 2) + "\n");
 const m = "service/src/main.ts";
 fs.writeFileSync(m, fs.readFileSync(m, "utf8").replace(/name: "service"/, "name: \"" + process.argv[1] + "\""));
+const c = "service/SERVICE.md";
+fs.writeFileSync(c, fs.readFileSync(c, "utf8").replaceAll("`service`", "`" + process.argv[1] + "`").replace("PG_SCHEMA=service", "PG_SCHEMA=" + process.argv[1]).replace("/api/service/", "/api/" + process.argv[1] + "/"));
 ' "$name"
 echo "created $target (origin: smart-contract-services-${name}, upstream: ${upstream})"
