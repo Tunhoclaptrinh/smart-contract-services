@@ -10,9 +10,9 @@ import { createRequire } from "node:module";
 const url = process.env.DATABASE_URL;
 const skip = url ? false : "DATABASE_URL is not set";
 const schema = `codecash_test_${process.pid}`;
-const pg = createRequire(join(process.cwd(), "services/api/package.json"))(
-  "pg",
-);
+const pg = createRequire(
+  join(process.cwd(), "packages/nest-common/package.json"),
+)("pg");
 let repo, dir, client;
 
 before(async () => {
@@ -24,8 +24,7 @@ before(async () => {
     STORAGE_DRIVER: "postgres",
     PG_SCHEMA: schema,
   });
-  const { Repository } =
-    await import("../services/api/dist/common/repository.js");
+  const { Repository } = await import("../dist/repository.js");
   repo = new Repository();
   await repo.init();
   client = new pg.Client({ connectionString: url });
@@ -158,8 +157,7 @@ test(
     await repo.transact(["users"], (t) => {
       t.users.push(row("u9", { email: "c@x.vn" }));
     });
-    const { verifyChain } =
-      await import("../services/api/dist/common/audit-chain.js");
+    const { verifyChain } = await import("../dist/audit-chain.js");
     assert.equal(verifyChain(await repo.list("audit")).ok, true);
   },
 );
