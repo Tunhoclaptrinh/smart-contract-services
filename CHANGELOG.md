@@ -2,6 +2,7 @@
 
 Mỗi bước dựng phần nền ghi một mục; mới nhất ở trên.
 
+- **docs: keep the base on its own branch** — nhánh `base` chỉ chứa phần nền, `main` chứa nền cộng nghiệp vụ; quy trình sửa nền rồi đồng bộ sang `main`, quy trình làm nghiệp vụ, quy tắc bảo vệ nhánh (`docs/QUY_TRINH_NHANH.md`); script bật bảo vệ nhánh trên GitHub (`scripts/protect-branches.sh`)
 - **build: add the API image and CI** — `services/api/Dockerfile` (một image cho mỗi service, build từ gốc repo), CI chạy typecheck, lint, format, test (có PostgreSQL), khởi động API, rồi build và chạy image trên PostgreSQL
 - **feat(auth): let a company sign up with its account administrator** — `POST /auth/register`: công ty mới (bên mua hoặc nhà cung cấp) kèm tài khoản quản trị công ty, kiểm trường theo `resources.json`, email và mã không trùng, mật khẩu ≥ 12 ký tự, ghi nhật ký `REGISTER`; tắt bằng `SIGNUP=false`
 - **test: add the resource CRUD and PostgreSQL storage tests** — 14 test CRUD (phạm vi tổ chức, lọc, khoá phiên bản, nhập/xuất, quyền, quản trị công ty); test PostgreSQL chạy khi có `DATABASE_URL`
