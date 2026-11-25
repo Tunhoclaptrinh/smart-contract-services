@@ -30,7 +30,8 @@ ENV NODE_ENV=production \
     API_HOST=0.0.0.0 \
     API_PORT=3000 \
     REPO_ROOT=/app \
-    DATA_DIR=/data
+    DATA_DIR=/data \
+    TRUST_DIR=/data/trust
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/services/api/node_modules ./services/api/node_modules
