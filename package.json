@@ -9,6 +9,7 @@
     "lint": "eslint --max-warnings 0 services",
     "format": "prettier --write services packages",
     "format:check": "prettier --check services packages",
+    "test": "pnpm build && node tests/resource.test.mjs && node tests/postgres.test.mjs",
     "infra:up": "docker compose -f infra/compose.yaml up -d --wait",
     "infra:up:pg": "docker compose -f infra/compose.yaml --profile postgres up -d --wait postgres",
     "infra:down": "docker compose -f infra/compose.yaml down"
