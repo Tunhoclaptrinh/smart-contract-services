@@ -2,6 +2,7 @@
 
 Mỗi bước dựng phần nền ghi một mục; mới nhất ở trên.
 
+- **test: run each service's own tests** — `pnpm test` chạy thêm `test` của `service/` nếu có; smoke chấp nhận mọi tên service
 - **refactor: turn the API into the chassis and a service template** — `services/api/src/common` thành gói `packages/nest-common` (giữ lịch sử từng tệp), thêm `bootstrapService()`, `HealthController`; `service/` là khuôn service mỏng; phần riêng của identity (đăng nhập, đăng ký, tài khoản seed, test CRUD) chuyển sang repo `smart-contract-services-identity`; `docs/KIEN_TRUC_REPO.md`, `scripts/new-service.sh`; `repoRoot` dò thư mục có `packages/contracts`
 - **docs: let the repository admin merge when CI is green** — bảo vệ nhánh không áp dụng cho admin, để trưởng nhóm merge việc nền khi chưa có người duyệt; thành viên vẫn cần 1 người duyệt và CI xanh
 - **docs: name base task branches core/<task>; allow running CI by hand** — Git không cho có cùng lúc nhánh `base` và `base/<việc>`, nên nhánh việc của phần nền đổi thành `core/<việc>`; CI thêm `workflow_dispatch`
