@@ -34,4 +34,5 @@ export * from "./interceptors/logging.interceptor";
 export * from "./interceptors/transform.interceptor";
 export * from "./utils/csv";
 export * from "./utils/csv-parse";
+export * from "./utils/xlsx";
 export * from "./utils/query-builder";

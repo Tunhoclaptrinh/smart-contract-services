@@ -14,6 +14,7 @@ import {
 import type { Response } from "express";
 import { BaseService } from "../services/base.service";
 import type { SessionRequest } from "../types";
+import { attachmentHeader } from "../utils/csv";
 import {
   BulkDeleteDto,
   ExportQueryDto,
@@ -35,13 +36,10 @@ export class BaseController {
     @Res() res: Response,
   ) {
     const file = await this.service.export(name, query, req.user);
-    const ext = file.contentType.startsWith("text/csv") ? "csv" : "json";
     res.setHeader("Content-Type", file.contentType);
     res.setHeader("X-Content-Type-Options", "nosniff");
-    res.setHeader(
-      "Content-Disposition",
-      `attachment; filename="${name}.${ext}"`,
-    );
+    res.setHeader("Cache-Control", "no-store");
+    res.setHeader("Content-Disposition", attachmentHeader(file.fileName));
     res.send(file.body);
   }
   @Get(":resource/columns") columns(
@@ -60,7 +58,7 @@ export class BaseController {
     res.setHeader("Content-Type", "text/csv; charset=utf-8");
     res.setHeader(
       "Content-Disposition",
-      `attachment; filename="${name}_template.csv"`,
+      attachmentHeader(`${name}_template.csv`),
     );
     res.send(csv);
   }

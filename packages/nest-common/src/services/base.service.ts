@@ -5,6 +5,7 @@ import {
   ForbiddenException,
   NotFoundException,
   ConflictException,
+  PayloadTooLargeException,
 } from "@nestjs/common";
 import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
@@ -18,7 +19,8 @@ import {
   operatorsFor,
   parseFilterConditions,
 } from "../utils/query-builder";
-import { toCsv } from "../utils/csv";
+import { stampedName, toCsv } from "../utils/csv";
+import { toXlsx } from "../utils/xlsx";
 import { can, scopeOf } from "../permissions";
 import type { Actor, Field, Resource, RecordEntity } from "../types";
 import { repoRoot } from "../paths";
@@ -46,6 +48,15 @@ function readCell(field: Field, cell: string): unknown {
   }
   return cell;
 }
+
+/** Most rows one export returns; filter further for more. */
+export const MAX_EXPORT = 10_000;
+const SYSTEM_LABELS: Record<string, string> = {
+  id: "ID",
+  origin: "Nguồn",
+  createdAt: "Tạo lúc",
+  updatedAt: "Sửa lúc",
+};
 
 @Injectable()
 export class BaseService {
@@ -719,17 +730,19 @@ export class BaseService {
   }
   /**
    * Server-side export of the whole filtered result (Base import-export). Reference fields get a
-   * `<field>_name` column with the referenced record's name.
+   * `<field>_name` column with the referenced record's name. `header=label` titles the columns with
+   * their labels; more than MAX_EXPORT rows is refused so one request cannot pin the server.
    */
   async export(name: string, raw: object, actor: Actor) {
     const query = raw as Record<string, unknown>;
     const def = this.access(name, actor, "export");
     const format = String(query.format ?? "csv");
-    if (!["csv", "json"].includes(format))
+    if (!["csv", "json", "xlsx"].includes(format))
       throw new BadRequestException("INVALID_FORMAT");
-    let items = (await this.query(def, query, actor)).items.map((x) =>
-      this.shown(name, x, actor),
-    );
+    const header = String(query.header ?? "key");
+    if (!["key", "label"].includes(header))
+      throw new BadRequestException("INVALID_HEADER");
+    let items = (await this.query(def, query, actor)).items;
     if (query.limit !== undefined) {
       const limit = Number(query.limit);
       const page = Number(query.page ?? 1);
@@ -742,6 +755,9 @@ export class BaseService {
         throw new BadRequestException("INVALID_PAGINATION");
       items = items.slice((page - 1) * limit, page * limit);
     }
+    if (items.length > MAX_EXPORT)
+      throw new PayloadTooLargeException("EXPORT_TOO_LARGE");
+    const shown = items.map((x) => this.shown(name, x, actor));
     const available = [
       "id",
       ...def.fields.map((f) => f.key),
@@ -750,26 +766,22 @@ export class BaseService {
       "updatedAt",
     ];
     const requested = query.columns
-      ? String(query.columns).split(",").filter(Boolean)
+      ? String(query.columns)
+          .split(",")
+          .map((c) => c.trim())
+          .filter(Boolean)
       : def.fields.map((f) => f.key);
-    if (requested.some((column) => !available.includes(column)))
+    if (
+      !requested.length ||
+      requested.some((column) => !available.includes(column))
+    )
       throw new BadRequestException("INVALID_COLUMN");
-    const names = new Map<string, Map<string, string>>();
-    for (const f of def.fields.filter(
-      (f) => f.ref && requested.includes(f.key),
-    ))
-      if (!names.has(f.ref!))
-        names.set(
-          f.ref!,
-          new Map(
-            (await this.repo.list(f.ref!)).map((r) => [r.id, String(r.name)]),
-          ),
-        );
+    const names = await this.referenceNames(def, requested);
     const columns = requested.flatMap((column) => {
       const field = def.fields.find((f) => f.key === column);
       return field?.ref ? [column, `${column}_name`] : [column];
     });
-    const rows = items.map((item) =>
+    const rows = shown.map((item) =>
       Object.fromEntries(
         columns.map((column) => {
           if (column.endsWith("_name")) {
@@ -785,10 +797,36 @@ export class BaseService {
         }),
       ),
     );
+    const titles = columns.map((column) => {
+      if (header === "key") return column;
+      const base = column.endsWith("_name") ? column.slice(0, -5) : column;
+      const field = def.fields.find((f) => f.key === base);
+      const label = field?.label ?? SYSTEM_LABELS[base] ?? base;
+      return column === base ? label : `${label} (tên)`;
+    });
     await this.audit("EXPORT", name, String(rows.length), actor);
-    return format === "json"
-      ? { contentType: "application/json", body: JSON.stringify(rows, null, 2) }
-      : { contentType: "text/csv; charset=utf-8", body: toCsv(columns, rows) };
+    const fileName = stampedName(name);
+    if (format === "json")
+      return {
+        contentType: "application/json",
+        fileName: `${fileName}.json`,
+        body: JSON.stringify(rows, null, 2),
+      };
+    if (format === "xlsx")
+      return {
+        contentType:
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        fileName: `${fileName}.xlsx`,
+        body: await toXlsx(name, titles, columns, rows),
+      };
+    const csvRows = rows.map((row) =>
+      Object.fromEntries(columns.map((c, i) => [titles[i], row[c]])),
+    );
+    return {
+      contentType: "text/csv; charset=utf-8",
+      fileName: `${fileName}.csv`,
+      body: toCsv(titles, csvRows),
+    };
   }
   async bulkDelete(name: string, body: unknown, actor: Actor) {
     const def = this.access(name, actor, "delete");
