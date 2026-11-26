@@ -12,7 +12,12 @@ import { resolve } from "node:path";
 import bcrypt from "bcryptjs";
 import { Repository } from "../repository";
 import { parsePage } from "../dto/pagination.dto";
-import { parseFilters } from "../utils/query-builder";
+import {
+  compareCells,
+  meets,
+  operatorsFor,
+  parseFilterConditions,
+} from "../utils/query-builder";
 import { toCsv } from "../utils/csv";
 import { can, scopeOf } from "../permissions";
 import type { Actor, Field, Resource, RecordEntity } from "../types";
@@ -161,46 +166,94 @@ export class BaseService {
       (a.code && b.code === a.code) || (a.email && b.email === a.email),
     );
   }
+  /** Columns a list can filter and sort on: system columns plus the declared fields. */
+  private columnTypes(def: Resource, use: "filter" | "sort") {
+    const types: Record<string, string> = {
+      id: "string",
+      createdAt: "datetime",
+      updatedAt: "datetime",
+    };
+    for (const f of def.fields)
+      if ((use === "filter" ? f.filterable : f.sortable) !== false)
+        types[f.key] = f.ref ? "ref" : f.type;
+    return types;
+  }
+  /** id → name of every record of the resources `def` points to. */
+  private async referenceNames(def: Resource, keys?: string[]) {
+    const names = new Map<string, Map<string, string>>();
+    for (const f of def.fields)
+      if (f.ref && !names.has(f.ref) && (!keys || keys.includes(f.key)))
+        names.set(
+          f.ref,
+          new Map(
+            (await this.repo.list(f.ref)).map((r) => [
+              r.id,
+              String(r.name ?? r.displayName ?? r.code ?? ""),
+            ]),
+          ),
+        );
+    return names;
+  }
+  /**
+   * Column descriptions for the web's table, filter bar and import mapping: type, label, which
+   * operators apply, options of a select, target of a reference.
+   */
+  async columns(name: string, actor: Actor) {
+    const def = this.access(name, actor, "read");
+    const filterable = this.columnTypes(def, "filter");
+    const sortable = this.columnTypes(def, "sort");
+    const describe = (
+      key: string,
+      type: string,
+      extra: Partial<Field> = {},
+    ) => ({
+      key,
+      label: extra.label ?? key,
+      type: extra.ref ? "ref" : type,
+      required: Boolean(extra.required),
+      sortable: key in sortable,
+      filterable: key in filterable,
+      operators:
+        key in filterable ? operatorsFor(extra.ref ? "ref" : type) : [],
+      facet: Boolean(extra.ref) || ["select", "boolean"].includes(type),
+      ...(extra.options ? { options: extra.options } : {}),
+      ...(extra.ref ? { ref: extra.ref } : {}),
+      ...(extra.unique ? { unique: true } : {}),
+      ...(extra.description ? { description: extra.description } : {}),
+      system: !def.fields.some((f) => f.key === key),
+    });
+    return [
+      describe("id", "string", { label: "ID" }),
+      ...def.fields.map((f) => describe(f.key, f.type, f)),
+      describe("createdAt", "datetime", { label: "Tạo lúc" }),
+      describe("updatedAt", "datetime", { label: "Sửa lúc" }),
+    ];
+  }
   /** Scoped, filtered, searched and sorted records; `list` pages them and `export` takes all. */
   private async query(
     def: Resource,
     query: Record<string, unknown>,
     actor: Actor,
   ) {
-    const allowed = [
-      "id",
-      "createdAt",
-      "updatedAt",
-      ...def.fields.map((f) => f.key),
-    ];
-    const filters = parseFilters(query.filters, allowed);
+    const conditions = parseFilterConditions(
+      query.filters,
+      this.columnTypes(def, "filter"),
+    );
     const sort = String(query.sortBy ?? "createdAt");
-    if (!allowed.includes(sort)) throw new BadRequestException("INVALID_SORT");
+    if (!(sort in this.columnTypes(def, "sort")))
+      throw new BadRequestException("INVALID_SORT");
     if (query.sortOrder && !["asc", "desc"].includes(String(query.sortOrder)))
       throw new BadRequestException("INVALID_SORT");
-    let items = (await this.repo.list(def.name)).filter((x) =>
+    const scope = (await this.repo.list(def.name)).filter((x) =>
       this.visible(def.name, x, actor),
     );
-    items = items.filter((x) =>
-      Object.entries(filters).every(([k, values]) =>
-        (values as unknown[]).includes(x[k]),
-      ),
+    let items = scope.filter((x) =>
+      conditions.every((c) => meets(x[c.field], c, fold)),
     );
+    const names = await this.referenceNames(def);
     if (query.search) {
       // Every word must appear, accents and case ignored; a reference also matches by its name.
       const words = fold(String(query.search)).split(/\s+/).filter(Boolean);
-      const names = new Map<string, Map<string, string>>();
-      for (const f of def.fields)
-        if (f.ref && !names.has(f.ref))
-          names.set(
-            f.ref,
-            new Map(
-              (await this.repo.list(f.ref)).map((r) => [
-                r.id,
-                String(r.name ?? ""),
-              ]),
-            ),
-          );
       items = items.filter((x) => {
         const text = fold(
           def.fields
@@ -215,24 +268,67 @@ export class BaseService {
         return words.every((word) => text.includes(word));
       });
     }
-    items.sort((a, b) => {
-      const x = a[sort],
-        y = b[sort];
-      const cmp =
-        typeof x === "number" && typeof y === "number"
-          ? x - y
-          : String(x ?? "").localeCompare(String(y ?? ""));
-      return (
-        (query.sortOrder === "asc" ? 1 : -1) * cmp || a.id.localeCompare(b.id)
-      );
-    });
-    return items;
+    // A reference sorts by the name people see, not by its id; empty values go last.
+    const ref = def.fields.find((f) => f.key === sort)?.ref;
+    const key = (x: RecordEntity) =>
+      ref ? (names.get(ref)?.get(String(x[sort])) ?? x[sort]) : x[sort];
+    const direction = query.sortOrder === "asc" ? 1 : -1;
+    items.sort(
+      (a, b) =>
+        direction * compareCells(key(a), key(b)) || a.id.localeCompare(b.id),
+    );
+    return { items, scope };
+  }
+  /** `columns=a,b`: the record fields to return (id and version always come along). */
+  private projection(def: Resource, raw: unknown) {
+    if (raw === undefined || raw === "") return null;
+    const requested = String(raw)
+      .split(",")
+      .map((c) => c.trim())
+      .filter(Boolean);
+    const available = [
+      "id",
+      "version",
+      "createdAt",
+      "updatedAt",
+      "origin",
+      ...def.fields.map((f) => f.key),
+    ];
+    if (!requested.length || requested.some((c) => !available.includes(c)))
+      throw new BadRequestException("INVALID_COLUMN");
+    return new Set(["id", "version", ...requested]);
+  }
+  /** `facets=kind,active`: distinct values with counts over the caller's whole scope. */
+  private facets(def: Resource, raw: unknown, scope: RecordEntity[]) {
+    if (raw === undefined || raw === "") return undefined;
+    const keys = String(raw)
+      .split(",")
+      .map((c) => c.trim())
+      .filter(Boolean);
+    const out: Record<string, { value: string; count: number }[]> = {};
+    for (const key of keys) {
+      const field = def.fields.find((f) => f.key === key);
+      if (!field || !(field.ref || ["select", "boolean"].includes(field.type)))
+        throw new BadRequestException("INVALID_FACET");
+      const counts = new Map<string, number>();
+      for (const row of scope) {
+        const value = row[key];
+        if (value === undefined || value === null || value === "") continue;
+        counts.set(String(value), (counts.get(String(value)) ?? 0) + 1);
+      }
+      out[key] = [...counts]
+        .map(([value, count]) => ({ value, count }))
+        .sort((a, b) => compareCells(a.value, b.value));
+    }
+    return out;
   }
   async list(name: string, raw: object, actor: Actor) {
     const query = raw as Record<string, unknown>;
     const def = this.access(name, actor, "read");
     const { page: asked, limit } = parsePage(query);
-    const items = await this.query(def, query, actor);
+    const pick = this.projection(def, query.columns);
+    const { items, scope } = await this.query(def, query, actor);
+    const facets = this.facets(def, query.facets, scope);
     // A page past the end (rows removed meanwhile) is answered with the last page, as the
     // workflow lists do; the client follows the page it was served.
     const totalPages = Math.max(1, Math.ceil(items.length / limit));
@@ -240,11 +336,18 @@ export class BaseService {
     return {
       items: items
         .slice((page - 1) * limit, page * limit)
-        .map((x) => this.shown(name, x, actor)),
+        .map((x) => this.shown(name, x, actor))
+        .map((x) =>
+          pick
+            ? Object.fromEntries(Object.entries(x).filter(([k]) => pick.has(k)))
+            : x,
+        ),
       total: items.length,
       page,
       limit,
       totalPages,
+      scopeTotal: scope.length,
+      ...(facets ? { facets } : {}),
     };
   }
   async get(name: string, id: string, actor: Actor) {
@@ -465,7 +568,7 @@ export class BaseService {
     const format = String(query.format ?? "csv");
     if (!["csv", "json"].includes(format))
       throw new BadRequestException("INVALID_FORMAT");
-    let items = (await this.query(def, query, actor)).map((x) =>
+    let items = (await this.query(def, query, actor)).items.map((x) =>
       this.shown(name, x, actor),
     );
     if (query.limit !== undefined) {

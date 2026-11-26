@@ -61,6 +61,22 @@ export class ListQueryDto {
   @IsString()
   @MaxLength(4000)
   filters?: string;
+
+  @ApiPropertyOptional({
+    description: "Comma-separated field keys to return, in order",
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  columns?: string;
+
+  @ApiPropertyOptional({
+    description: "Comma-separated select/boolean/ref fields to count values of",
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  facets?: string;
 }
 
 export class ImportBodyDto {
@@ -90,10 +106,4 @@ export class ExportQueryDto extends ListQueryDto {
   @IsOptional()
   @IsIn(["csv", "json"])
   format?: string;
-
-  @ApiPropertyOptional({ description: "Comma-separated field keys, in order" })
-  @IsOptional()
-  @IsString()
-  @MaxLength(2000)
-  columns?: string;
 }
