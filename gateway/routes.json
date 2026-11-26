@@ -1,12 +1,114 @@
 {
   "$comment": "Path prefix → service (its <NAME>_URL). Longest prefix wins. Add a service's prefixes when it starts (docs/HE_THONG.md). Public routes skip the token check; everything else needs a valid access token.",
   "routes": [
-    { "prefix": "/api/v1/auth", "service": "identity" },
-    { "prefix": "/api/v1/.well-known", "service": "identity" },
-    { "prefix": "/api/v1/resources/organizations", "service": "identity" },
-    { "prefix": "/api/v1/resources/users", "service": "identity" },
-    { "prefix": "/api/v1/resources/settings", "service": "identity" },
-    { "prefix": "/api/v1/permissions", "service": "identity" }
+    {
+      "prefix": "/api/v1/auth",
+      "service": "identity"
+    },
+    {
+      "prefix": "/api/v1/.well-known",
+      "service": "identity"
+    },
+    {
+      "prefix": "/api/v1/resources/organizations",
+      "service": "identity"
+    },
+    {
+      "prefix": "/api/v1/resources/users",
+      "service": "identity"
+    },
+    {
+      "prefix": "/api/v1/resources/settings",
+      "service": "identity"
+    },
+    {
+      "prefix": "/api/v1/permissions",
+      "service": "identity"
+    },
+    {
+      "prefix": "/api/v1/templates",
+      "service": "contract"
+    },
+    {
+      "prefix": "/api/v1/contracts",
+      "service": "contract"
+    },
+    {
+      "prefix": "/api/v1/documents",
+      "service": "signing"
+    },
+    {
+      "prefix": "/api/v1/signing-sessions",
+      "service": "signing"
+    },
+    {
+      "prefix": "/api/v1/verifications",
+      "service": "signing"
+    },
+    {
+      "prefix": "/api/v1/public",
+      "service": "signing"
+    },
+    {
+      "prefix": "/api/v1/executions",
+      "service": "execution"
+    },
+    {
+      "prefix": "/api/v1/milestones",
+      "service": "execution"
+    },
+    {
+      "prefix": "/api/v1/tasks",
+      "service": "execution"
+    },
+    {
+      "prefix": "/api/v1/disputes",
+      "service": "execution"
+    },
+    {
+      "prefix": "/api/v1/exceptions",
+      "service": "execution"
+    },
+    {
+      "prefix": "/api/v1/contract-imports",
+      "service": "execution"
+    },
+    {
+      "prefix": "/api/v1/evaluations",
+      "service": "decision"
+    },
+    {
+      "prefix": "/api/v1/decisions",
+      "service": "decision"
+    },
+    {
+      "prefix": "/api/v1/rule-sets",
+      "service": "decision"
+    },
+    {
+      "prefix": "/api/v1/payment-orders",
+      "service": "payment"
+    },
+    {
+      "prefix": "/api/v1/bank-callbacks",
+      "service": "payment"
+    },
+    {
+      "prefix": "/api/v1/audit-entries",
+      "service": "audit"
+    },
+    {
+      "prefix": "/api/v1/audit",
+      "service": "audit"
+    },
+    {
+      "prefix": "/api/v1/notifications",
+      "service": "audit"
+    },
+    {
+      "prefix": "/api/v1/dlq",
+      "service": "audit"
+    }
   ],
   "public": [
     "POST /api/v1/auth/login",
@@ -19,6 +121,8 @@
     "GET /api/v1/auth/demo-accounts",
     "POST /api/v1/auth/demo-login",
     "GET /api/v1/auth/outbox",
-    "GET /api/v1/.well-known/jwks.json"
+    "GET /api/v1/.well-known/jwks.json",
+    "GET /api/v1/public/*",
+    "POST /api/v1/bank-callbacks"
   ]
 }

@@ -6,7 +6,7 @@
   },
   "item": [
     {
-      "name": "01 Gateway health",
+      "name": "01 Gateway health: every service up",
       "request": {
         "method": "GET",
         "header": [],
@@ -27,7 +27,8 @@
             "type": "text/javascript",
             "exec": [
               "pm.test(\"status 200\", () => pm.response.to.have.status(200));",
-              "pm.test(\"identity up\", () => pm.expect(pm.response.json().data.upstreams.identity).to.eql(\"ok\"));"
+              "const up = pm.response.json().data.upstreams;",
+              "pm.test(\"every service is up behind the gateway\", () => { for (const name of [\"identity\",\"contract\",\"signing\",\"execution\",\"decision\",\"payment\",\"audit\"]) pm.expect(up[name], name).to.eql(\"ok\"); });"
             ]
           }
         }

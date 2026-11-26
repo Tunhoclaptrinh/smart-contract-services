@@ -45,14 +45,95 @@ services:
       AUTH_RATE_LIMIT: ${AUTH_RATE_LIMIT:-30}
     volumes: ["identity-data:/data"]
 
+  contract:
+    <<: *service
+    build: { context: ../btl-backend-contract, dockerfile: service/Dockerfile }
+    environment:
+      SERVICE_NAME: contract
+      STORAGE_DRIVER: postgres
+      DATABASE_URL: postgres://contract:contract-dev@postgres:5432/contract
+      PG_SCHEMA: contract
+      JWKS_URL: http://identity:3000/api/v1/.well-known/jwks.json
+      WEB_ORIGIN: ${WEB_ORIGIN:-http://127.0.0.1:5173}
+
+  signing:
+    <<: *service
+    build: { context: ../btl-backend-signing, dockerfile: service/Dockerfile }
+    environment:
+      SERVICE_NAME: signing
+      STORAGE_DRIVER: postgres
+      DATABASE_URL: postgres://signing:signing-dev@postgres:5432/signing
+      PG_SCHEMA: signing
+      JWKS_URL: http://identity:3000/api/v1/.well-known/jwks.json
+      WEB_ORIGIN: ${WEB_ORIGIN:-http://127.0.0.1:5173}
+      CONTRACT_URL: http://contract:3000
+
+  execution:
+    <<: *service
+    build: { context: ../btl-backend-execution, dockerfile: service/Dockerfile }
+    environment:
+      SERVICE_NAME: execution
+      STORAGE_DRIVER: postgres
+      DATABASE_URL: postgres://execution:execution-dev@postgres:5432/execution
+      PG_SCHEMA: execution
+      JWKS_URL: http://identity:3000/api/v1/.well-known/jwks.json
+      WEB_ORIGIN: ${WEB_ORIGIN:-http://127.0.0.1:5173}
+      DECISION_URL: http://decision:3000
+      SIGNING_URL: http://signing:3000
+
+  payment:
+    <<: *service
+    build: { context: ../btl-backend-payment, dockerfile: service/Dockerfile }
+    environment:
+      SERVICE_NAME: payment
+      STORAGE_DRIVER: postgres
+      DATABASE_URL: postgres://payment:payment-dev@postgres:5432/payment
+      PG_SCHEMA: payment
+      JWKS_URL: http://identity:3000/api/v1/.well-known/jwks.json
+      WEB_ORIGIN: ${WEB_ORIGIN:-http://127.0.0.1:5173}
+      EXECUTION_URL: http://execution:3000
+      DECISION_URL: http://decision:3000
+
+  audit:
+    <<: *service
+    build: { context: ../btl-backend-audit, dockerfile: service/Dockerfile }
+    environment:
+      SERVICE_NAME: audit
+      STORAGE_DRIVER: postgres
+      DATABASE_URL: postgres://audit:audit-dev@postgres:5432/audit
+      PG_SCHEMA: audit
+      JWKS_URL: http://identity:3000/api/v1/.well-known/jwks.json
+      WEB_ORIGIN: ${WEB_ORIGIN:-http://127.0.0.1:5173}
+
+  decision:
+    <<: *service
+    build: { context: ../btl-backend-decision, dockerfile: Dockerfile }
+    environment:
+      SERVICE_NAME: decision
+      DATABASE_URL: postgres://decision:decision-dev@postgres:5432/decision
+      PG_SCHEMA: decision
+      JWKS_URL: http://identity:3000/api/v1/.well-known/jwks.json
+
   gateway:
     build: { context: ., dockerfile: gateway/Dockerfile }
     restart: unless-stopped
     networks: [backend]
     depends_on:
       identity: { condition: service_healthy }
+      contract: { condition: service_healthy }
+      signing: { condition: service_healthy }
+      execution: { condition: service_healthy }
+      decision: { condition: service_healthy }
+      payment: { condition: service_healthy }
+      audit: { condition: service_healthy }
     environment:
       IDENTITY_URL: http://identity:3000
+      CONTRACT_URL: http://contract:3000
+      SIGNING_URL: http://signing:3000
+      EXECUTION_URL: http://execution:3000
+      DECISION_URL: http://decision:3000
+      PAYMENT_URL: http://payment:3000
+      AUDIT_URL: http://audit:3000
       JWKS_URL: http://identity:3000/api/v1/.well-known/jwks.json
       WEB_ORIGIN: ${WEB_ORIGIN:-http://127.0.0.1:5173,http://localhost:5173}
       GATEWAY_RATE_LIMIT: ${GATEWAY_RATE_LIMIT:-600}
