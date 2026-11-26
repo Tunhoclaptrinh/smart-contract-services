@@ -142,7 +142,7 @@ export function problemBody(input: {
   requestId?: string;
 }): ProblemDetails {
   return {
-    type: `urn:problem:${input.code.toLowerCase().replace(/_/g, "-")}`,
+    type: `urn:problem:${input.code.split(":")[0].toLowerCase().replace(/_/g, "-")}`,
     title: TITLES[input.status] ?? "Error",
     status: input.status,
     detail: input.code,
