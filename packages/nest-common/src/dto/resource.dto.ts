@@ -140,10 +140,15 @@ export class BulkDeleteDto {
 }
 
 export class ExportQueryDto extends ListQueryDto {
-  @ApiPropertyOptional({ enum: ["csv", "json"], default: "csv" })
+  @ApiPropertyOptional({ enum: ["csv", "json", "xlsx"], default: "csv" })
   @IsOptional()
-  @IsIn(["csv", "json"])
+  @IsIn(["csv", "json", "xlsx"])
   format?: string;
+
+  @ApiPropertyOptional({ enum: ["key", "label"], default: "key" })
+  @IsOptional()
+  @IsIn(["key", "label"])
+  header?: "key" | "label";
 }
 
 export class TemplateQueryDto {
