@@ -27,10 +27,25 @@ import { INTERNAL_ROLES, orgAdminRefusal } from "../roles";
 import { auditDigest } from "../audit-chain";
 import { fieldProblem, normalizeField } from "../field-validation";
 import { ValidationProblem, toFieldIssue } from "../problem";
+import { parseCsv } from "../utils/csv-parse";
+import { IMPORT_MODES, MAX_BATCH, type ImportMode } from "../dto/resource.dto";
 
 /** Each operation maps to `<resource>:<operation>` in packages/contracts/permissions.json. */
 type Operation = "read" | "create" | "update" | "delete" | "import" | "export";
-const MAX_BATCH = 500;
+
+/** A CSV cell as the field's type; text that is not a valid value stays text and fails validation. */
+function readCell(field: Field, cell: string): unknown {
+  if (field.type === "number") {
+    const n = Number(cell.replace(/\s/g, ""));
+    return Number.isFinite(n) ? n : cell;
+  }
+  if (field.type === "boolean") {
+    const v = fold(cell);
+    if (["true", "1", "yes", "co", "x"].includes(v)) return true;
+    if (["false", "0", "no", "khong"].includes(v)) return false;
+  }
+  return cell;
+}
 
 @Injectable()
 export class BaseService {
@@ -158,12 +173,21 @@ export class BaseService {
     const errors = await this.referenceErrors(def, data);
     if (errors.length) throw new ValidationProblem(errors);
   }
+  /** Fields declared `unique` in resources.json; resources that declare none keep code/email. */
+  private uniqueKeys(def: Resource) {
+    const declared = def.fields.filter((f) => f.unique).map((f) => f.key);
+    return declared.length
+      ? declared
+      : ["code", "email"].filter((k) => def.fields.some((f) => f.key === k));
+  }
   private duplicate(
+    def: Resource,
     a: Record<string, unknown>,
     b: Record<string, unknown>,
   ): boolean {
-    return Boolean(
-      (a.code && b.code === a.code) || (a.email && b.email === a.email),
+    return this.uniqueKeys(def).some(
+      (k) =>
+        a[k] !== undefined && a[k] !== null && a[k] !== "" && b[k] === a[k],
     );
   }
   /** Columns a list can filter and sort on: system columns plus the declared fields. */
@@ -388,7 +412,7 @@ export class BaseService {
     await this.repo.mutate(
       name,
       (items) => {
-        if (items.some((x) => this.duplicate(data, x)))
+        if (items.some((x) => this.duplicate(def, data, x)))
           throw new ConflictException("DUPLICATE_RECORD");
         items.push(item);
       },
@@ -425,7 +449,7 @@ export class BaseService {
         this.assertUnmanaged(def, items[i]);
         if (items[i].version !== expected)
           throw new ConflictException("VERSION_CONFLICT");
-        if (items.some((x) => x.id !== id && this.duplicate(data, x)))
+        if (items.some((x) => x.id !== id && this.duplicate(def, data, x)))
           throw new ConflictException("DUPLICATE_RECORD");
         updated = {
           ...items[i],
@@ -462,11 +486,118 @@ export class BaseService {
     );
     return { deleted: true };
   }
-  private importRows(body: unknown): unknown[] {
-    const rows = (body as { items?: unknown })?.items;
+  /**
+   * Rows of an import, from JSON `items` or a CSV text. CSV headers match a field key or label (or
+   * go through `mapping`); CSV cells are text, so they are read as the field's type here.
+   */
+  private importInput(def: Resource, body: unknown) {
+    const input = (body ?? {}) as {
+      items?: unknown;
+      csv?: unknown;
+      mapping?: unknown;
+      mode?: unknown;
+      key?: unknown;
+    };
+    const mode = (input.mode ?? "all-or-nothing") as ImportMode;
+    if (!(IMPORT_MODES as readonly string[]).includes(mode))
+      throw new BadRequestException("INVALID_IMPORT_MODE");
+    let rows: unknown[];
+    if (typeof input.csv === "string") {
+      if (input.items !== undefined)
+        throw new BadRequestException("INVALID_IMPORT");
+      let table: string[][];
+      try {
+        table = parseCsv(input.csv);
+      } catch {
+        throw new BadRequestException("INVALID_CSV");
+      }
+      const [headers = [], ...lines] = table;
+      const mapping =
+        input.mapping && typeof input.mapping === "object"
+          ? (input.mapping as Record<string, unknown>)
+          : {};
+      const keys = headers.map((raw) => {
+        const header = raw.trim();
+        const mapped = mapping[header];
+        const field = def.fields.find(
+          (f) =>
+            f.key === (typeof mapped === "string" ? mapped : header) ||
+            (mapped === undefined &&
+              f.label !== undefined &&
+              fold(f.label) === fold(header)),
+        );
+        // `id`, `createdAt`… of an exported file are ignored rather than refused.
+        if (
+          !field &&
+          !["id", "version", "createdAt", "updatedAt", "origin"].includes(
+            header,
+          ) &&
+          !header.endsWith("_name")
+        )
+          throw new ValidationProblem([`UNKNOWN_COLUMN:${header}`]);
+        return field;
+      });
+      rows = lines.map((cells) =>
+        Object.fromEntries(
+          keys.flatMap((field, i) => {
+            const cell = (cells[i] ?? "").trim();
+            if (!field || cell === "") return [];
+            return [[field.key, readCell(field, cell)]];
+          }),
+        ),
+      );
+    } else rows = input.items as unknown[];
     if (!Array.isArray(rows) || !rows.length || rows.length > MAX_BATCH)
       throw new BadRequestException("INVALID_IMPORT");
-    return rows;
+    const key = mode === "upsert" ? String(input.key ?? "") : undefined;
+    if (key !== undefined && !this.uniqueKeys(def).includes(key))
+      throw new BadRequestException("INVALID_IMPORT_KEY");
+    return { rows, mode, key };
+  }
+  /**
+   * Checks every row the way the import will write it: field rules, references, unique values
+   * against the stored records and the rows above it, and (upsert) the record a row updates.
+   */
+  private async planImport(def: Resource, body: unknown, actor: Actor) {
+    const { rows, mode, key } = this.importInput(def, body);
+    const existing = await this.repo.list(def.name);
+    const cache = new Map<string, Set<string>>();
+    const accepted: Record<string, unknown>[] = [];
+    const results = [];
+    for (const [index, row] of rows.entries()) {
+      const field = key ? def.fields.find((f) => f.key === key) : undefined;
+      const wanted =
+        field && row && typeof row === "object"
+          ? normalizeField(field, (row as Record<string, unknown>)[field.key])
+          : undefined;
+      const target =
+        key && wanted !== undefined && wanted !== ""
+          ? existing.find((x) => x[key] === wanted)
+          : undefined;
+      const { errors, data } = this.fieldErrors(def, row, Boolean(target));
+      errors.push(...(await this.referenceErrors(def, data, cache)));
+      if (target && !this.visible(def.name, target, actor))
+        errors.push("RECORD_NOT_FOUND");
+      else if (target && def.managedOrigins?.includes(String(target.origin)))
+        errors.push("MANAGED_RECORD");
+      if (
+        [...existing.filter((x) => x.id !== target?.id), ...accepted].some(
+          (other) => this.duplicate(def, data, other),
+        )
+      )
+        errors.push("DUPLICATE_RECORD");
+      if (!errors.length) accepted.push(data);
+      results.push({
+        row: index + 1,
+        data: row,
+        status: errors.length ? ("invalid" as const) : ("valid" as const),
+        action: target ? ("update" as const) : ("create" as const),
+        ...(target ? { targetId: target.id } : {}),
+        errors,
+        values: data,
+      });
+    }
+    return { mode, results };
   }
   /**
    * Dry run of an import: one result per row with every problem found, so the user can fix the
@@ -474,70 +605,92 @@ export class BaseService {
    */
   async validateImport(name: string, body: unknown, actor: Actor) {
     const def = this.access(name, actor, "import");
-    const rows = this.importRows(body);
-    const existing = await this.repo.list(name);
-    const cache = new Map<string, Set<string>>();
-    const accepted: Record<string, unknown>[] = [];
-    const results = [];
-    for (const [index, row] of rows.entries()) {
-      const { errors, data } = this.fieldErrors(def, row);
-      errors.push(...(await this.referenceErrors(def, data, cache)));
-      if (
-        [...existing, ...accepted].some((other) => this.duplicate(data, other))
-      )
-        errors.push("DUPLICATE_RECORD");
-      if (!errors.length) accepted.push(data);
-      results.push({
-        row: index + 1,
-        data: row,
-        status: errors.length ? "invalid" : "valid",
-        errors,
-      });
-    }
-    const valid = results.filter((r) => r.status === "valid").length;
+    const { results } = await this.planImport(def, body, actor);
+    const valid = results.filter((r) => r.status === "valid");
     return {
-      summary: { total: rows.length, valid, error: rows.length - valid },
-      results,
+      summary: {
+        total: results.length,
+        valid: valid.length,
+        error: results.length - valid.length,
+      },
+      plan: {
+        create: valid.filter((r) => r.action === "create").length,
+        update: valid.filter((r) => r.action === "update").length,
+      },
+      results: results.map(({ values: _values, ...r }) => r),
     };
   }
-  /** All-or-nothing: one invalid row rejects the whole file. */
+  /**
+   * `all-or-nothing` (default) and `upsert`: one invalid row rejects the file, with every problem
+   * and its row. `skip-invalid`: valid rows are written, the others come back in `errors`.
+   */
   async import(name: string, body: unknown, actor: Actor) {
     const def = this.access(name, actor, "import");
-    const rows = this.importRows(body);
-    const cache = new Map<string, Set<string>>();
-    const prepared: RecordEntity[] = [];
-    const issues = [];
-    let firstCode: string | undefined;
-    for (const [index, value] of rows.entries()) {
-      const { errors, data } = this.fieldErrors(def, value);
-      errors.push(...(await this.referenceErrors(def, data, cache)));
-      if (errors.length) {
-        firstCode ??= errors[0];
-        issues.push(...errors.map((e) => toFieldIssue(e, index + 1)));
-        continue;
-      }
-      prepared.push(await this.newRecord(name, data, actor));
-    }
-    // Every problem of every row in one answer, so the file is fixed in one pass.
-    if (issues.length) throw new ValidationProblem(issues, firstCode);
+    const { mode, results } = await this.planImport(def, body, actor);
+    const invalid = results.filter((r) => r.status === "invalid");
+    const issues = invalid.flatMap((r) =>
+      r.errors.map((e) => toFieldIssue(e, r.row)),
+    );
+    if (invalid.length && mode !== "skip-invalid")
+      throw new ValidationProblem(issues, invalid[0].errors[0]);
+    const valid = results.filter((r) => r.status === "valid");
+    if (!valid.length)
+      throw new ValidationProblem(issues, invalid[0]?.errors[0]);
+    const created: RecordEntity[] = [];
+    for (const r of valid.filter((r) => r.action === "create"))
+      created.push(await this.newRecord(name, r.values, actor));
+    const updates = valid.filter((r) => r.action === "update");
     await this.repo.mutate(
       name,
       (items) => {
-        const all = [...items];
-        for (const item of prepared) {
-          if (all.some((x) => this.duplicate(item, x)))
-            throw new ConflictException("DUPLICATE_RECORD");
-          all.push(item);
+        // Checked again inside the write: another request may have changed the table meanwhile.
+        const now = new Date().toISOString();
+        for (const r of updates) {
+          const i = items.findIndex((x) => x.id === r.targetId);
+          if (i < 0) throw new NotFoundException("RECORD_NOT_FOUND");
+          this.assertUnmanaged(def, items[i]);
+          items[i] = {
+            ...items[i],
+            ...r.values,
+            version: items[i].version + 1,
+            updatedAt: now,
+          };
         }
-        items.push(...prepared);
+        for (const item of created) {
+          if (items.some((x) => this.duplicate(def, item, x)))
+            throw new ConflictException("DUPLICATE_RECORD");
+          items.push(item);
+        }
+        for (const r of updates)
+          if (
+            items.some(
+              (x) => x.id !== r.targetId && this.duplicate(def, r.values, x),
+            )
+          )
+            throw new ConflictException("DUPLICATE_RECORD");
       },
-      this.auditRecord("IMPORT", name, String(prepared.length), actor),
+      this.auditRecord(
+        "IMPORT",
+        name,
+        `created=${created.length};updated=${updates.length};skipped=${invalid.length}`,
+        actor,
+      ),
     );
-    return { created: prepared.length };
+    return {
+      created: created.length,
+      updated: updates.length,
+      skipped: invalid.length,
+      ...(invalid.length ? { errors: issues } : {}),
+    };
   }
-  /** Header row plus one sample row, in the column order the import expects. */
-  async template(name: string, actor: Actor) {
+  /**
+   * Header row plus one sample row, in the column order the import expects. `header=label` writes
+   * the labels (the import reads both).
+   */
+  async template(name: string, actor: Actor, header: unknown = "key") {
     const def = this.access(name, actor, "import");
+    if (!["key", "label"].includes(String(header)))
+      throw new BadRequestException("INVALID_HEADER");
     const sample: Record<string, unknown> = {};
     for (const f of def.fields) {
       const ref = f.ref ? (await this.repo.list(f.ref))[0]?.id : undefined;
@@ -548,15 +701,21 @@ export class BaseService {
           : f.type === "boolean"
             ? true
             : f.type === "number"
-              ? 1
+              ? (f.min ?? 1)
               : f.type === "email"
                 ? "name@example.com"
                 : "");
     }
-    return toCsv(
+    const csv = toCsv(
       def.fields.map((f) => f.key),
       [sample],
     );
+    if (header !== "label") return csv;
+    const labels = toCsv(
+      def.fields.map((f) => f.label ?? f.key),
+      [],
+    );
+    return labels + csv.slice(csv.indexOf("\r\n") + 2);
   }
   /**
    * Server-side export of the whole filtered result (Base import-export). Reference fields get a
