@@ -81,7 +81,10 @@ cần gì và vì sao; việc đó làm ở repo cha theo `core/<việc>` → `b
 - Định danh, chú thích tiếng Anh; tài liệu nhóm tiếng Việt.
 - Tiền: không dùng số thực. Số tiền là chuỗi thập phân hoặc số nguyên đơn vị nhỏ nhất, như CodeCash.
 - Lỗi nghiệp vụ: ném exception của Nest với mã `UPPER_SNAKE_CASE` (`ConflictException("NOT_YOUR_TURN")`);
-  bộ lọc chung trả `{ code, message, requestId }`.
+  bộ lọc chung trả RFC 9457 `application/problem+json`: `{ type, title, status, detail, code, traceId,
+  errors?, statusCode, message, requestId }`. Nhiều lỗi theo trường: `throw new ValidationProblem([...])`.
+- Đầu vào endpoint riêng: viết DTO bằng `class-validator` (pipe toàn cục đã bật whitelist,
+  forbidNonWhitelisted, transform); không nhận `@Body() body: any` ở endpoint mới.
 - Quyền: khai báo trong `packages/contracts/permissions.json`, gắn bằng `@RequirePermission("<resource>:<action>")`;
   route công khai dùng `@Public()`.
 - Nhật ký kiểm toán: chỉ ghi qua `Repository.transact` (chuỗi băm), không sửa, không xoá mục cũ.

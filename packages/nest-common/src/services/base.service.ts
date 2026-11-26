@@ -21,6 +21,7 @@ import { fold } from "../listing";
 import { INTERNAL_ROLES, orgAdminRefusal } from "../roles";
 import { auditDigest } from "../audit-chain";
 import { fieldProblem, normalizeField } from "../field-validation";
+import { ValidationProblem, toFieldIssue } from "../problem";
 
 /** Each operation maps to `<resource>:<operation>` in packages/contracts/permissions.json. */
 type Operation = "read" | "create" | "update" | "delete" | "import" | "export";
@@ -126,7 +127,7 @@ export class BaseService {
   }
   private validate(def: Resource, body: unknown, partial = false) {
     const { errors, data } = this.fieldErrors(def, body, partial);
-    if (errors.length) throw new BadRequestException(errors[0]);
+    if (errors.length) throw new ValidationProblem(errors);
     return data;
   }
   /** Ids referenced by `ref` fields that do not exist in the target resource. */
@@ -150,7 +151,7 @@ export class BaseService {
   }
   private async checkReferences(def: Resource, data: Record<string, unknown>) {
     const errors = await this.referenceErrors(def, data);
-    if (errors.length) throw new BadRequestException(errors[0]);
+    if (errors.length) throw new ValidationProblem(errors);
   }
   private duplicate(
     a: Record<string, unknown>,
@@ -227,7 +228,8 @@ export class BaseService {
     });
     return items;
   }
-  async list(name: string, query: Record<string, unknown>, actor: Actor) {
+  async list(name: string, raw: object, actor: Actor) {
+    const query = raw as Record<string, unknown>;
     const def = this.access(name, actor, "read");
     const { page: asked, limit } = parsePage(query);
     const items = await this.query(def, query, actor);
@@ -401,12 +403,20 @@ export class BaseService {
     const rows = this.importRows(body);
     const cache = new Map<string, Set<string>>();
     const prepared: RecordEntity[] = [];
-    for (const value of rows) {
-      const data = this.validate(def, value);
-      const references = await this.referenceErrors(def, data, cache);
-      if (references.length) throw new BadRequestException(references[0]);
+    const issues = [];
+    let firstCode: string | undefined;
+    for (const [index, value] of rows.entries()) {
+      const { errors, data } = this.fieldErrors(def, value);
+      errors.push(...(await this.referenceErrors(def, data, cache)));
+      if (errors.length) {
+        firstCode ??= errors[0];
+        issues.push(...errors.map((e) => toFieldIssue(e, index + 1)));
+        continue;
+      }
       prepared.push(await this.newRecord(name, data, actor));
     }
+    // Every problem of every row in one answer, so the file is fixed in one pass.
+    if (issues.length) throw new ValidationProblem(issues, firstCode);
     await this.repo.mutate(
       name,
       (items) => {
@@ -449,7 +459,8 @@ export class BaseService {
    * Server-side export of the whole filtered result (Base import-export). Reference fields get a
    * `<field>_name` column with the referenced record's name.
    */
-  async export(name: string, query: Record<string, unknown>, actor: Actor) {
+  async export(name: string, raw: object, actor: Actor) {
+    const query = raw as Record<string, unknown>;
     const def = this.access(name, actor, "export");
     const format = String(query.format ?? "csv");
     if (!["csv", "json"].includes(format))

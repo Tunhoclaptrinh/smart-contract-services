@@ -14,6 +14,12 @@ import {
 import type { Response } from "express";
 import { BaseService } from "../services/base.service";
 import type { SessionRequest } from "../types";
+import {
+  BulkDeleteDto,
+  ExportQueryDto,
+  ImportBodyDto,
+  ListQueryDto,
+} from "../dto/resource.dto";
 @Controller("resources")
 export class BaseController {
   constructor(@Inject(BaseService) private service: BaseService) {}
@@ -23,7 +29,7 @@ export class BaseController {
   /** Declared before `:resource/:id` so these names are never read as record ids. */
   @Get(":resource/export") async export(
     @Param("resource") name: string,
-    @Query() query: Record<string, unknown>,
+    @Query() query: ExportQueryDto,
     @Req() req: SessionRequest,
     @Res() res: Response,
   ) {
@@ -52,7 +58,7 @@ export class BaseController {
   }
   @Get(":resource") list(
     @Param("resource") name: string,
-    @Query() query: Record<string, unknown>,
+    @Query() query: ListQueryDto,
     @Req() req: SessionRequest,
   ) {
     return this.service.list(name, query, req.user);
@@ -88,21 +94,21 @@ export class BaseController {
   }
   @Post(":resource/import/validate") validateImport(
     @Param("resource") name: string,
-    @Body() body: unknown,
+    @Body() body: ImportBodyDto,
     @Req() req: SessionRequest,
   ) {
     return this.service.validateImport(name, body, req.user);
   }
   @Post(":resource/import") import(
     @Param("resource") name: string,
-    @Body() body: unknown,
+    @Body() body: ImportBodyDto,
     @Req() req: SessionRequest,
   ) {
     return this.service.import(name, body, req.user);
   }
   @Post(":resource/bulk-delete") bulkDelete(
     @Param("resource") name: string,
-    @Body() body: unknown,
+    @Body() body: BulkDeleteDto,
     @Req() req: SessionRequest,
   ) {
     return this.service.bulkDelete(name, body, req.user);

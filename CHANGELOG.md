@@ -2,6 +2,7 @@
 
 Mỗi bước dựng phần nền ghi một mục; mới nhất ở trên.
 
+- **feat(nest-common): RFC 9457 errors and a global ValidationPipe** — lỗi trả `application/problem+json` (`type`, `title`, `status`, `detail`, `instance`, `code`, `traceId`, `errors[]` theo trường), giữ `statusCode`/`message`/`requestId` cho client cũ; `ValidationPipe` toàn cục (whitelist, forbidNonWhitelisted, transform); DTO `ListQueryDto`, `ExportQueryDto`, `ImportBodyDto`, `BulkDeleteDto` cho CRUD chung; tạo, sửa và nhập báo **mọi** lỗi (nhập kèm số dòng), `message` vẫn là mã đầu tiên; test đơn vị chassis `packages/nest-common/test/problem.test.mjs`
 - **fix: new service repositories track all their branches** — `new-service.sh` clone một nhánh nên `origin` chỉ lấy `base`; giờ đặt lại refspec. Kiểm phần nền coi repo không có nhánh `base` là repo service (lấy `base` của repo cha), kể cả khi tên gói chưa đổi
 - **docs: keep each service's changelog in service/** — `CHANGELOG.md` gốc là của phần nền; service ghi `service/CHANGELOG.md` (khuôn có sẵn), kiểm phần nền không cho sửa tệp gốc nữa, vì đồng bộ phần nền luôn xung đột ở đầu tệp
 - **test: sign the smoke token for the seeded administrator** — identity kiểm cả tài khoản có tồn tại, nên token của smoke dùng `u-sysadmin` (tài khoản seed); service khác chỉ đọc claims
