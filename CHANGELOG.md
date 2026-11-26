@@ -2,6 +2,7 @@
 
 Mỗi bước dựng phần nền ghi một mục; mới nhất ở trên.
 
+- **feat(infra): one database and one login per service** — `infra/postgres-init.sql` tạo database và tài khoản riêng cho từng service, thu quyền kết nối chéo (MS-R2); `compose.yaml` của nhánh `main` gắn nó vào Postgres
 - **build: lint, format and test the gateway too when it exists** — `lint`, `format`, `format:check`, `test` gồm `gateway/` (nhánh `main` của repo cha); không có thư mục đó thì bỏ qua
 - **feat(nest-common): let a demo stack keep its signing key on a volume** — production không có `JWT_PRIVATE_KEY` mà đặt `JWT_GENERATE_KEY=true` thì sinh khoá vào `JWT_KEY_DIR` (dùng cho `docker compose` chạy demo)
 - **fix(nest-common): processes starting together share one dev signing key** — khoá dev ghi trọn vào tệp tạm rồi `link` vào chỗ, tiến trình đến sau đọc khoá đã có (test chạy song song từng sinh hai khoá khác nhau)
