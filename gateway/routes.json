@@ -1,0 +1,24 @@
+{
+  "$comment": "Path prefix → service (its <NAME>_URL). Longest prefix wins. Add a service's prefixes when it starts (docs/HE_THONG.md). Public routes skip the token check; everything else needs a valid access token.",
+  "routes": [
+    { "prefix": "/api/v1/auth", "service": "identity" },
+    { "prefix": "/api/v1/.well-known", "service": "identity" },
+    { "prefix": "/api/v1/resources/organizations", "service": "identity" },
+    { "prefix": "/api/v1/resources/users", "service": "identity" },
+    { "prefix": "/api/v1/resources/settings", "service": "identity" },
+    { "prefix": "/api/v1/permissions", "service": "identity" }
+  ],
+  "public": [
+    "POST /api/v1/auth/login",
+    "POST /api/v1/auth/register",
+    "POST /api/v1/auth/refresh",
+    "POST /api/v1/auth/forgot-password",
+    "POST /api/v1/auth/reset-password",
+    "GET /api/v1/auth/invitations/*",
+    "POST /api/v1/auth/invitations/accept",
+    "GET /api/v1/auth/demo-accounts",
+    "POST /api/v1/auth/demo-login",
+    "GET /api/v1/auth/outbox",
+    "GET /api/v1/.well-known/jwks.json"
+  ]
+}

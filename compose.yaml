@@ -1,0 +1,65 @@
+# The whole system on one machine (MS-R7): clone the repositories side by side
+# (docs/HE_THONG.md), `cp .env.example .env` if you want to change defaults, then
+#   docker compose up --build --wait
+# Web and Postman call the gateway only (http://127.0.0.1:3000/api/v1); services publish no port.
+# Each service has its own database (MS-R2), created by infra/postgres-init.sql.
+name: smart-contract
+x-service: &service
+  restart: unless-stopped
+  networks: [backend]
+  depends_on:
+    postgres: { condition: service_healthy }
+services:
+  postgres:
+    image: postgres:17.6
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: platform
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-platform-dev}
+      POSTGRES_DB: platform
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./infra/postgres-init.sql:/docker-entrypoint-initdb.d/10-databases.sql:ro
+    networks: [backend]
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "platform", "-d", "platform"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  identity:
+    <<: *service
+    build: { context: ../btl-backend-identity, dockerfile: service/Dockerfile }
+    environment:
+      SERVICE_NAME: identity
+      STORAGE_DRIVER: postgres
+      DATABASE_URL: postgres://identity:${IDENTITY_DB_PASSWORD:-identity-dev}@postgres:5432/identity
+      PG_SCHEMA: identity
+      # Demo stack: the signing key is generated once and kept on the volume. Production passes
+      # JWT_PRIVATE_KEY instead.
+      JWT_GENERATE_KEY: "true"
+      JWT_KEY_DIR: /data/jwt
+      SEED_PASSWORD: ${SEED_PASSWORD:-Passw0rd!}
+      DEMO_LOGIN: ${DEMO_LOGIN:-true}
+      WEB_ORIGIN: ${WEB_ORIGIN:-http://127.0.0.1:5173}
+      AUTH_RATE_LIMIT: ${AUTH_RATE_LIMIT:-30}
+    volumes: ["identity-data:/data"]
+
+  gateway:
+    build: { context: ., dockerfile: gateway/Dockerfile }
+    restart: unless-stopped
+    networks: [backend]
+    depends_on:
+      identity: { condition: service_healthy }
+    environment:
+      IDENTITY_URL: http://identity:3000
+      JWKS_URL: http://identity:3000/api/v1/.well-known/jwks.json
+      WEB_ORIGIN: ${WEB_ORIGIN:-http://127.0.0.1:5173,http://localhost:5173}
+      GATEWAY_RATE_LIMIT: ${GATEWAY_RATE_LIMIT:-600}
+    ports: ["127.0.0.1:${GATEWAY_PUBLISH_PORT:-3000}:3000"]
+
+networks:
+  backend:
+volumes:
+  postgres-data:
+  identity-data:

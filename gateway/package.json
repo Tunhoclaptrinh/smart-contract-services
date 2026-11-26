@@ -1,0 +1,14 @@
+{
+  "name": "@sc/gateway",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "dev": "tsx watch src/main.ts",
+    "build": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\" && tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test test/*.test.mjs"
+  },
+  "dependencies": {
+    "@sc/nest-common": "workspace:*"
+  }
+}
