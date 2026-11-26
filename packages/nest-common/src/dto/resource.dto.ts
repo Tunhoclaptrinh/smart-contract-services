@@ -79,17 +79,55 @@ export class ListQueryDto {
   facets?: string;
 }
 
+export const IMPORT_MODES = [
+  "all-or-nothing",
+  "skip-invalid",
+  "upsert",
+] as const;
+export type ImportMode = (typeof IMPORT_MODES)[number];
+
+/**
+ * An import: rows as JSON objects (`items`) or a CSV text (`csv`, first line = headers matched to a
+ * field key or label, or through `mapping`). `mode` decides what happens to invalid rows.
+ */
 export class ImportBodyDto {
-  @ApiProperty({
+  @ApiPropertyOptional({
     type: "array",
     items: { type: "object" },
     maxItems: MAX_BATCH,
   })
+  @IsOptional()
   @IsArray()
   @ArrayMinSize(1)
   @ArrayMaxSize(MAX_BATCH)
   @IsObject({ each: true })
-  items!: Record<string, unknown>[];
+  items?: Record<string, unknown>[];
+
+  @ApiPropertyOptional({ description: "CSV text, UTF-8, header row first" })
+  @IsOptional()
+  @IsString()
+  @MaxLength(3_000_000)
+  csv?: string;
+
+  @ApiPropertyOptional({
+    description: 'Header → field key, e.g. {"Tên công ty":"name"}',
+  })
+  @IsOptional()
+  @IsObject()
+  mapping?: Record<string, string>;
+
+  @ApiPropertyOptional({ enum: IMPORT_MODES, default: "all-or-nothing" })
+  @IsOptional()
+  @IsIn(IMPORT_MODES)
+  mode?: ImportMode;
+
+  @ApiPropertyOptional({
+    description: "Unique field that finds the record to update (upsert)",
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  key?: string;
 }
 
 export class BulkDeleteDto {
@@ -106,4 +144,11 @@ export class ExportQueryDto extends ListQueryDto {
   @IsOptional()
   @IsIn(["csv", "json"])
   format?: string;
+}
+
+export class TemplateQueryDto {
+  @ApiPropertyOptional({ enum: ["key", "label"], default: "key" })
+  @IsOptional()
+  @IsIn(["key", "label"])
+  header?: "key" | "label";
 }

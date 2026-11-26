@@ -19,6 +19,7 @@ import {
   ExportQueryDto,
   ImportBodyDto,
   ListQueryDto,
+  TemplateQueryDto,
 } from "../dto/resource.dto";
 @Controller("resources")
 export class BaseController {
@@ -51,10 +52,11 @@ export class BaseController {
   }
   @Get(":resource/template") async template(
     @Param("resource") name: string,
+    @Query() query: TemplateQueryDto,
     @Req() req: SessionRequest,
     @Res() res: Response,
   ) {
-    const csv = await this.service.template(name, req.user);
+    const csv = await this.service.template(name, req.user, query.header);
     res.setHeader("Content-Type", "text/csv; charset=utf-8");
     res.setHeader(
       "Content-Disposition",
