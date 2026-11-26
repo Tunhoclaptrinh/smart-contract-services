@@ -37,6 +37,7 @@ Từ thư mục gốc repo này, mã cũ ở **`../codecash`**. Không có thì 
 | Tệp cũ nào chuyển sang service nào | `docs/DOI_CHIEU_CODECASH.md` |
 | Ai làm gì, ngày nào, prompt mẫu | `docs/KICH_BAN_VIBE_CODE.md` |
 | Quy trình nhánh, cấu trúc repo | `docs/QUY_TRINH_NHANH.md`, `docs/KIEN_TRUC_REPO.md` |
+| Chassis có gì, CRUD chung (lọc, nhập, xuất), định dạng lỗi | `packages/nest-common/MODULES.md` (đọc thay vì mở mã chassis) |
 
 Mã cũ và tài liệu cũ mâu thuẫn nhau thì `NGHIEP_VU.md` thắng; ghi chỗ mâu thuẫn vào
 `service/SERVICE.md` (mục "Rà soát").
