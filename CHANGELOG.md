@@ -2,6 +2,7 @@
 
 Mỗi bước dựng phần nền ghi một mục; mới nhất ở trên.
 
+- **build: lint, format and test the gateway too when it exists** — `lint`, `format`, `format:check`, `test` gồm `gateway/` (nhánh `main` của repo cha); không có thư mục đó thì bỏ qua
 - **feat(nest-common): let a demo stack keep its signing key on a volume** — production không có `JWT_PRIVATE_KEY` mà đặt `JWT_GENERATE_KEY=true` thì sinh khoá vào `JWT_KEY_DIR` (dùng cho `docker compose` chạy demo)
 - **fix(nest-common): processes starting together share one dev signing key** — khoá dev ghi trọn vào tệp tạm rồi `link` vào chỗ, tiến trình đến sau đọc khoá đã có (test chạy song song từng sinh hai khoá khác nhau)
 - **feat(nest-common): RS256 tokens with JWKS, storage-aware health, ServiceClient** — token truy cập ký RS256 (`JWT_PRIVATE_KEY`, dev tự sinh ở `.data-jwt`), `publicJwks()` cho identity, nơi kiểm dùng `JWT_PUBLIC_KEY` hoặc `JWKS_URL` (tải lại khi gặp `kid` lạ), HS256 bị từ chối, `JWT_SECRET` bỏ; `TOKEN_TTL` mặc định 15m; `/health` hỏi kho dữ liệu, hỏng thì 503; `ServiceClient` gọi giữa service có timeout, thử lại lỗi hạ tầng với method idempotent, 4xx trả nguyên, 502/503/504; `.env.example` thêm `*_URL`; CI image dùng khoá RSA sinh tạm
