@@ -9,6 +9,7 @@ x-service: &service
   networks: [backend]
   depends_on:
     postgres: { condition: service_healthy }
+    rabbitmq: { condition: service_healthy }
 services:
   postgres:
     image: postgres:17.6
@@ -27,11 +28,28 @@ services:
       timeout: 5s
       retries: 20
 
+  # Event bus (outbox relay, consumers, dead-letter queues). Management UI: http://127.0.0.1:15672
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: scw
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-scw-dev}
+    ports: ["127.0.0.1:${RABBITMQ_UI_PORT:-15672}:15672"]
+    volumes: ["rabbitmq-data:/var/lib/rabbitmq"]
+    networks: [backend]
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 10s
+      retries: 20
+
   identity:
     <<: *service
     build: { context: ../btl-backend-identity, dockerfile: service/Dockerfile }
     environment:
       SERVICE_NAME: identity
+      BUS_URL: amqp://scw:${RABBITMQ_PASSWORD:-scw-dev}@rabbitmq:5672
       STORAGE_DRIVER: postgres
       DATABASE_URL: postgres://identity:${IDENTITY_DB_PASSWORD:-identity-dev}@postgres:5432/identity
       PG_SCHEMA: identity
@@ -50,6 +68,7 @@ services:
     build: { context: ../btl-backend-contract, dockerfile: service/Dockerfile }
     environment:
       SERVICE_NAME: contract
+      BUS_URL: amqp://scw:${RABBITMQ_PASSWORD:-scw-dev}@rabbitmq:5672
       STORAGE_DRIVER: postgres
       DATABASE_URL: postgres://contract:contract-dev@postgres:5432/contract
       PG_SCHEMA: contract
@@ -61,6 +80,7 @@ services:
     build: { context: ../btl-backend-signing, dockerfile: service/Dockerfile }
     environment:
       SERVICE_NAME: signing
+      BUS_URL: amqp://scw:${RABBITMQ_PASSWORD:-scw-dev}@rabbitmq:5672
       STORAGE_DRIVER: postgres
       DATABASE_URL: postgres://signing:signing-dev@postgres:5432/signing
       PG_SCHEMA: signing
@@ -73,6 +93,7 @@ services:
     build: { context: ../btl-backend-execution, dockerfile: service/Dockerfile }
     environment:
       SERVICE_NAME: execution
+      BUS_URL: amqp://scw:${RABBITMQ_PASSWORD:-scw-dev}@rabbitmq:5672
       STORAGE_DRIVER: postgres
       DATABASE_URL: postgres://execution:execution-dev@postgres:5432/execution
       PG_SCHEMA: execution
@@ -86,6 +107,7 @@ services:
     build: { context: ../btl-backend-payment, dockerfile: service/Dockerfile }
     environment:
       SERVICE_NAME: payment
+      BUS_URL: amqp://scw:${RABBITMQ_PASSWORD:-scw-dev}@rabbitmq:5672
       STORAGE_DRIVER: postgres
       DATABASE_URL: postgres://payment:payment-dev@postgres:5432/payment
       PG_SCHEMA: payment
@@ -99,6 +121,7 @@ services:
     build: { context: ../btl-backend-audit, dockerfile: service/Dockerfile }
     environment:
       SERVICE_NAME: audit
+      BUS_URL: amqp://scw:${RABBITMQ_PASSWORD:-scw-dev}@rabbitmq:5672
       STORAGE_DRIVER: postgres
       DATABASE_URL: postgres://audit:audit-dev@postgres:5432/audit
       PG_SCHEMA: audit
@@ -110,6 +133,7 @@ services:
     build: { context: ../btl-backend-decision, dockerfile: Dockerfile }
     environment:
       SERVICE_NAME: decision
+      BUS_URL: amqp://scw:${RABBITMQ_PASSWORD:-scw-dev}@rabbitmq:5672
       DATABASE_URL: postgres://decision:decision-dev@postgres:5432/decision
       PG_SCHEMA: decision
       JWKS_URL: http://identity:3000/api/v1/.well-known/jwks.json
@@ -143,4 +167,5 @@ networks:
   backend:
 volumes:
   postgres-data:
+  rabbitmq-data:
   identity-data:
