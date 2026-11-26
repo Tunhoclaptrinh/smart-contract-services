@@ -43,6 +43,12 @@ export class BaseController {
     );
     res.send(file.body);
   }
+  @Get(":resource/columns") columns(
+    @Param("resource") name: string,
+    @Req() req: SessionRequest,
+  ) {
+    return this.service.columns(name, req.user);
+  }
   @Get(":resource/template") async template(
     @Param("resource") name: string,
     @Req() req: SessionRequest,
