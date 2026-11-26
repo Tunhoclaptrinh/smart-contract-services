@@ -1,16 +1,37 @@
 # Service `service`
 
-Thẻ của service: AI và người đọc tệp này trước khi sửa mã. Chủ service cập nhật nó trong mỗi PR
-làm đổi phạm vi. Mẫu này nằm trong khuôn; `scripts/new-service.sh` điền tên.
+Thẻ của service: AI và người đọc tệp này trước khi sửa mã. Chủ service cập nhật nó **trong cùng
+commit** với mã theo luật ở mục 4 của `CLAUDE.md` (CI `pnpm check:docs` nhắc khi quên). Mẫu này nằm
+trong khuôn; `scripts/new-service.sh` điền tên.
 
 ## Thông tin
 
 | | |
 | --- | --- |
 | Chủ | (tên, tài khoản GitHub) |
-| Cổng mặc định | (xem bảng ở `docs/DOI_CHIEU_CODECASH.md`) |
+| Cổng mặc định | (xem bảng ở `docs/HE_THONG.md`) |
 | Schema PostgreSQL | `PG_SCHEMA=service` |
 | Gọi qua gateway | `/api/service/...` |
+
+## Sơ đồ mã
+
+Mỗi tệp trong `service/src` một dòng: làm gì. AI đọc bảng này thay vì mở từng tệp.
+
+| Tệp | Làm gì |
+| --- | --- |
+| `main.ts` | Khởi động: `bootstrapService({ module, name, port })` |
+
+## Sơ đồ luồng
+
+Luồng chính của service (Mermaid). Sửa khi đổi luồng, thêm lời gọi sang service khác hoặc sự kiện.
+
+```mermaid
+sequenceDiagram
+  participant W as Web (qua gateway)
+  participant S as service
+  W->>S: (endpoint)
+  S-->>W: (kết quả)
+```
 
 ## Dữ liệu sở hữu
 
