@@ -2,6 +2,7 @@
 
 Mỗi bước dựng phần nền ghi một mục; mới nhất ở trên.
 
+- **ci: run the whole stack and the Postman collection** — job `stack` (repo cha, khi có `compose.yaml`): checkout repo service cạnh repo cha, `docker compose up --build --wait`, Newman chạy `postman/`; lỗi thì in log compose (MS-R7, MS-R8, MS-B4)
 - **feat(infra): one database and one login per service** — `infra/postgres-init.sql` tạo database và tài khoản riêng cho từng service, thu quyền kết nối chéo (MS-R2); `compose.yaml` của nhánh `main` gắn nó vào Postgres
 - **build: lint, format and test the gateway too when it exists** — `lint`, `format`, `format:check`, `test` gồm `gateway/` (nhánh `main` của repo cha); không có thư mục đó thì bỏ qua
 - **feat(nest-common): let a demo stack keep its signing key on a volume** — production không có `JWT_PRIVATE_KEY` mà đặt `JWT_GENERATE_KEY=true` thì sinh khoá vào `JWT_KEY_DIR` (dùng cho `docker compose` chạy demo)
