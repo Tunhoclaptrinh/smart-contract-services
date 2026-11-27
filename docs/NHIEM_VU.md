@@ -22,14 +22,14 @@ timeout và circuit breaker, idempotency, outbox, hàng đợi RabbitMQ), gatewa
 
 ## 2. Ai làm gì
 
-| Người | Service (repo `smart-contract-services-<tên>`) | Màn web | Thẻ nhiệm vụ |
-| --- | --- | --- | --- |
-| TV1, nhóm trưởng | identity, gateway, phần nền, `compose.yaml` | đăng nhập, quản trị | `nhiem-vu/TV1.md` |
-| TV2 | contract | soạn, rà soát hợp đồng | `nhiem-vu/TV2.md` |
-| TV3 | signing (ký, tài liệu, xác minh) | ký, xác minh | `nhiem-vu/TV3.md` |
-| TV4 | execution | việc cần làm, mốc, chứng từ, tranh chấp | `nhiem-vu/TV4.md` |
-| TV5 | decision, payment | quyết định, bộ luật, duyệt chi | `nhiem-vu/TV5.md` |
-| TV6 | audit (nhật ký, thông báo), hàng đợi | nhật ký, tổng quan, thông báo | `nhiem-vu/TV6.md` |
+| Người | GitHub | Service (repo `smart-contract-services-<tên>`) | Màn web | Thẻ nhiệm vụ |
+| --- | --- | --- | --- | --- |
+| TV1, nhóm trưởng | @Tunhoclaptrinh | identity, gateway, phần nền, `compose.yaml` | đăng nhập, quản trị | `nhiem-vu/TV1.md` |
+| TV2 | @tuananhuhuudu | contract | soạn, rà soát hợp đồng | `nhiem-vu/TV2.md` |
+| TV3 | @Anleee117 | signing (ký, tài liệu, xác minh) | ký, xác minh | `nhiem-vu/TV3.md` |
+| TV4 | @quoccuong2005 | execution | việc cần làm, mốc, chứng từ, tranh chấp | `nhiem-vu/TV4.md` |
+| TV5 | @youngtruong | decision, payment | quyết định, bộ luật, duyệt chi | `nhiem-vu/TV5.md` |
+| TV6 | @Tran-Anh-Sang | audit (nhật ký, thông báo), hàng đợi | nhật ký, tổng quan, thông báo | `nhiem-vu/TV6.md` |
 
 Mỗi người giữ **trọn một lát**: service + màn web gọi nó + test + request Postman + phần báo cáo của
 mình. Không sửa repo của người khác; cần gì thì nói với chủ của nó.
